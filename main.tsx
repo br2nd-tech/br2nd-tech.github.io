@@ -1,38 +1,74 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as THREE from 'three'
 import './style.css'
 
-type Layer = 'public' | 'admin' | 'ops'
+type Layer = 'surface' | 'control' | 'signal'
 
-const layers: Record<Layer, { index: string; title: string; body: string; signals: string[] }> = {
-  public: {
-    index: '01 / public',
-    title: 'The part people touch.',
-    body: 'Interfaces that help someone choose, understand, book, buy, and get on with their day.',
-    signals: ['Responsive product UI', 'Catalogs & conversion flows', 'React / Svelte / Tailwind'],
+const layerOrder: Layer[] = ['surface', 'control', 'signal']
+
+const layers: Record<Layer, {
+  label: string
+  code: string
+  title: string
+  body: string
+  proof: string
+  color: string
+}> = {
+  surface: {
+    label: 'Public surface',
+    code: 'UI',
+    title: 'The part people choose.',
+    body: 'Clear product interfaces for browsing, understanding, booking and buying.',
+    proof: 'React · Svelte · responsive UI',
+    color: '#2347ff',
   },
-  admin: {
-    index: '02 / admin',
-    title: 'The part teams control.',
-    body: 'Custom back offices that give a client control over content, inventory, and operations — without a developer in the loop.',
-    signals: ['Purpose-built CMS', 'Role-aware workflows', 'One deploy, one product'],
+  control: {
+    label: 'Control room',
+    code: 'CMS',
+    title: 'The part the team owns.',
+    body: 'A custom back office shaped around the actual work — content, inventory and decisions.',
+    proof: 'Purpose-built admin · roles · one deploy',
+    color: '#ff4f2e',
   },
-  ops: {
-    index: '03 / ops',
-    title: 'The part that proves it works.',
-    body: 'Business rules, data and interfaces meet here: bookings, QR confirmation, sales signals and the decisions behind them.',
-    signals: ['Ticketing & QR validation', 'Sales analytics', 'Operational dashboards'],
+  signal: {
+    label: 'Operational signal',
+    code: 'OPS',
+    title: 'The part that closes the loop.',
+    body: 'Bookings, QR validation, sales signals and the rules that keep the product moving.',
+    proof: 'Workflows · analytics · live state',
+    color: '#75e2f0',
   },
 }
 
 const caseStudies = [
-  { name: 'BKS24', type: 'Corporate platform', url: 'https://bks24.by/' },
-  { name: 'Fintherm', type: 'Content-managed site', url: 'https://fintherm.com.ru/' },
-  { name: 'The One', type: 'Catalog + custom CMS', url: 'https://the-one.ru/' },
+  {
+    name: 'BKS24',
+    href: 'https://bks24.by/',
+    kind: 'Corporate platform',
+    copy: 'A production website built to make a technical company understandable at a glance.',
+    stack: 'TypeScript · responsive frontend',
+    visual: 'bks',
+  },
+  {
+    name: 'Fintherm',
+    href: 'https://fintherm.com.ru/',
+    kind: 'Website + content system',
+    copy: 'The public site and its editing workflow shipped as one maintainable product.',
+    stack: 'Custom CMS · content operations',
+    visual: 'fintherm',
+  },
+  {
+    name: 'The One',
+    href: 'https://the-one.ru/',
+    kind: 'Catalog + control room',
+    copy: 'A visual product catalog backed by an admin built to control every meaningful detail.',
+    stack: 'Catalog · custom admin · deployment',
+    visual: 'theone',
+  },
 ]
 
-function SystemCanvas({ active, onActive }: { active: Layer; onActive: (layer: Layer) => void }) {
+function ProductMachine({ active, onActive }: { active: Layer; onActive: (layer: Layer) => void }) {
   const host = useRef<HTMLDivElement>(null)
   const activeRef = useRef(active)
   activeRef.current = active
@@ -42,121 +78,254 @@ function SystemCanvas({ active, onActive }: { active: Layer; onActive: (layer: L
     if (!element) return
 
     const scene = new THREE.Scene()
-    scene.fog = new THREE.Fog('#1e2529', 8, 19)
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100)
-    camera.position.set(0, 1.8, 11.5)
+    scene.fog = new THREE.Fog('#edebe4', 12, 24)
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
+    camera.position.set(0, 0.2, 13)
+
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.15
+    renderer.domElement.setAttribute('aria-hidden', 'true')
     element.appendChild(renderer.domElement)
 
-    const clock = new THREE.Clock()
-    const pointer = new THREE.Vector2(2, 2)
-    const targetRotation = new THREE.Vector2()
-    const raycaster = new THREE.Raycaster()
-    const nodes: THREE.Group[] = []
-
-    scene.add(new THREE.HemisphereLight('#d9ded8', '#172228', 1.8))
-    const key = new THREE.DirectionalLight('#76b9d2', 2.5)
-    key.position.set(4, 7, 5)
+    scene.add(new THREE.HemisphereLight('#ffffff', '#98a7af', 2.4))
+    const key = new THREE.DirectionalLight('#ffffff', 4.2)
+    key.position.set(6, 8, 8)
     scene.add(key)
+    const blue = new THREE.PointLight('#2347ff', 18, 15)
+    blue.position.set(-5, -2, 4)
+    scene.add(blue)
+    const orange = new THREE.PointLight('#ff4f2e', 12, 12)
+    orange.position.set(5, 3, 2)
+    scene.add(orange)
 
-    const grid = new THREE.GridHelper(24, 24, '#36525e', '#2a3940')
-    grid.position.y = -2.1
-    grid.material.transparent = true
-    grid.material.opacity = 0.38
-    scene.add(grid)
+    const machine = new THREE.Group()
+    machine.rotation.set(-0.12, -0.3, -0.035)
+    scene.add(machine)
 
-    const specs: { layer: Layer; position: [number, number, number]; color: string; dimensions: [number, number, number] }[] = [
-      { layer: 'public', position: [-3.35, 0.85, 0], color: '#96d5ec', dimensions: [2.3, 2.95, 0.25] },
-      { layer: 'admin', position: [0, -0.1, 0.35], color: '#e4ddd0', dimensions: [2.6, 3.65, 0.3] },
-      { layer: 'ops', position: [3.35, 0.6, -0.15], color: '#ef6553', dimensions: [2.25, 2.45, 0.22] },
+    const targetRotation = new THREE.Vector2(-0.12, -0.3)
+    const pointer = new THREE.Vector2(2, 2)
+    const raycaster = new THREE.Raycaster()
+    const layerGroups: THREE.Group[] = []
+    const pickTargets: THREE.Object3D[] = []
+    const materials: Record<Layer, THREE.MeshStandardMaterial> = {} as Record<Layer, THREE.MeshStandardMaterial>
+
+    const frameMaterial = new THREE.MeshStandardMaterial({ color: '#171b19', roughness: 0.43, metalness: 0.55 })
+    const specs: Array<{ layer: Layer; y: number; z: number; width: number; height: number }> = [
+      { layer: 'surface', y: 1.05, z: 1.9, width: 5.4, height: 3.15 },
+      { layer: 'control', y: 0, z: 0, width: 6.1, height: 3.6 },
+      { layer: 'signal', y: -1.02, z: -1.9, width: 5.1, height: 2.9 },
     ]
 
-    specs.forEach((spec) => {
+    specs.forEach((spec, layerIndex) => {
       const group = new THREE.Group()
       group.name = spec.layer
-      group.position.set(...spec.position)
-      group.rotation.set(-0.1, spec.position[0] * -0.055, 0.03)
+      group.userData.baseY = spec.y
+      group.userData.baseZ = spec.z
+      group.position.set((layerIndex - 1) * 0.3, spec.y, spec.z)
 
-      const panel = new THREE.Mesh(
-        new THREE.BoxGeometry(...spec.dimensions),
-        new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.33, metalness: 0.12 }),
-      )
-      panel.name = spec.layer
-      group.add(panel)
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(spec.width + 0.26, spec.height + 0.26, 0.18), frameMaterial)
+      frame.name = spec.layer
+      group.add(frame)
+      pickTargets.push(frame)
 
-      const wire = new THREE.LineSegments(
-        new THREE.EdgesGeometry(new THREE.BoxGeometry(...spec.dimensions)),
-        new THREE.LineBasicMaterial({ color: '#162328', transparent: true, opacity: 0.65 }),
-      )
-      group.add(wire)
+      const material = new THREE.MeshStandardMaterial({
+        color: layers[spec.layer].color,
+        emissive: layers[spec.layer].color,
+        emissiveIntensity: spec.layer === activeRef.current ? 0.28 : 0.07,
+        roughness: 0.34,
+        metalness: 0.18,
+      })
+      materials[spec.layer] = material
+      const screen = new THREE.Mesh(new THREE.BoxGeometry(spec.width, spec.height, 0.2), material)
+      screen.name = spec.layer
+      screen.position.z = 0.14
+      group.add(screen)
+      pickTargets.push(screen)
 
-      const slots = new THREE.Group()
-      for (let i = 0; i < 4; i += 1) {
-        const slot = new THREE.Mesh(
-          new THREE.BoxGeometry(spec.dimensions[0] * 0.66, 0.055, 0.045),
-          new THREE.MeshBasicMaterial({ color: '#17262c', transparent: true, opacity: 0.63 }),
-        )
-        slot.position.set(0, 0.72 - i * 0.42, spec.dimensions[2] / 2 + 0.03)
-        slots.add(slot)
+      const ink = new THREE.MeshBasicMaterial({ color: '#111412', transparent: true, opacity: 0.78 })
+      const paleInk = new THREE.MeshBasicMaterial({ color: '#edebe4', transparent: true, opacity: 0.72 })
+      const content = new THREE.Group()
+      content.position.z = 0.27
+
+      const header = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.88, 0.12, 0.035), ink)
+      header.position.y = spec.height * 0.33
+      content.add(header)
+
+      if (spec.layer === 'surface') {
+        const hero = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.54, spec.height * 0.52, 0.04), paleInk)
+        hero.position.set(-spec.width * 0.15, -0.12, 0)
+        content.add(hero)
+        for (let i = 0; i < 3; i += 1) {
+          const line = new THREE.Mesh(new THREE.BoxGeometry(spec.width * (0.26 - i * 0.035), 0.09, 0.045), ink)
+          line.position.set(spec.width * 0.29, 0.42 - i * 0.32, 0)
+          content.add(line)
+        }
       }
-      group.add(slots)
-      nodes.push(group)
-      scene.add(group)
+
+      if (spec.layer === 'control') {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.17, spec.height * 0.68, 0.04), ink)
+        rail.position.set(-spec.width * 0.35, -0.12, 0)
+        content.add(rail)
+        for (let i = 0; i < 6; i += 1) {
+          const cell = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.25, 0.34, 0.045), i % 2 ? ink : paleInk)
+          cell.position.set(-spec.width * 0.08 + (i % 2) * spec.width * 0.29, 0.44 - Math.floor(i / 2) * 0.55, 0)
+          content.add(cell)
+        }
+      }
+
+      if (spec.layer === 'signal') {
+        const bars = [0.32, 0.7, 0.48, 0.88, 0.6, 1]
+        bars.forEach((height, index) => {
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.34, spec.height * height * 0.44, 0.045), ink)
+          bar.position.set(-1.25 + index * 0.5, -spec.height * 0.18 + (spec.height * height * 0.22), 0)
+          content.add(bar)
+        })
+        const status = new THREE.Mesh(new THREE.SphereGeometry(0.19, 20, 20), paleInk)
+        status.position.set(spec.width * 0.35, -spec.height * 0.24, 0.02)
+        content.add(status)
+      }
+
+      group.add(content)
+      layerGroups.push(group)
+      machine.add(group)
     })
 
-    const dust = new THREE.BufferGeometry()
-    const dustPoints = Array.from({ length: 220 }, () => [
+    const core = new THREE.Group()
+    const coreRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.68, 0.08, 12, 72),
+      new THREE.MeshStandardMaterial({ color: '#edebe4', emissive: '#75e2f0', emissiveIntensity: 0.45, metalness: 0.7, roughness: 0.2 }),
+    )
+    coreRing.rotation.x = Math.PI / 2
+    core.add(coreRing)
+    const coreDot = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 24, 24),
+      new THREE.MeshStandardMaterial({ color: '#ff4f2e', emissive: '#ff4f2e', emissiveIntensity: 1 }),
+    )
+    core.add(coreDot)
+    core.position.set(0, 0, 3.35)
+    machine.add(core)
+
+    const circuitMaterial = new THREE.LineBasicMaterial({ color: '#111412', transparent: true, opacity: 0.38 })
+    for (let i = 0; i < 14; i += 1) {
+      const angle = (i / 14) * Math.PI * 2
+      const radius = 4.2 + (i % 3) * 0.38
+      const points = [
+        new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.58, -3.2),
+        new THREE.Vector3(Math.cos(angle) * radius * 0.74, Math.sin(angle) * radius * 0.42, 0),
+        new THREE.Vector3(Math.cos(angle) * radius * 0.42, Math.sin(angle) * radius * 0.22, 3.25),
+      ]
+      machine.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), circuitMaterial))
+    }
+
+    const dustGeometry = new THREE.BufferGeometry()
+    const dust = Array.from({ length: 260 }, () => [
       (Math.random() - 0.5) * 15,
-      (Math.random() - 0.5) * 9,
-      (Math.random() - 0.5) * 5 - 1,
+      (Math.random() - 0.5) * 10,
+      (Math.random() - 0.5) * 10,
     ]).flat()
-    dust.setAttribute('position', new THREE.Float32BufferAttribute(dustPoints, 3))
-    const dustCloud = new THREE.Points(dust, new THREE.PointsMaterial({ color: '#a2c7ce', size: 0.025, transparent: true, opacity: 0.75 }))
+    dustGeometry.setAttribute('position', new THREE.Float32BufferAttribute(dust, 3))
+    const dustCloud = new THREE.Points(
+      dustGeometry,
+      new THREE.PointsMaterial({ color: '#2347ff', size: 0.028, transparent: true, opacity: 0.52 }),
+    )
     scene.add(dustCloud)
+
+    let dragging = false
+    let moved = 0
+    let lastX = 0
+    let lastY = 0
+
+    const updatePointer = (event: PointerEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect()
+      pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    }
+
+    const onPointerDown = (event: PointerEvent) => {
+      dragging = true
+      moved = 0
+      lastX = event.clientX
+      lastY = event.clientY
+      renderer.domElement.setPointerCapture(event.pointerId)
+      renderer.domElement.classList.add('is-dragging')
+    }
+
+    const onPointerMove = (event: PointerEvent) => {
+      updatePointer(event)
+      if (dragging) {
+        const dx = event.clientX - lastX
+        const dy = event.clientY - lastY
+        moved += Math.abs(dx) + Math.abs(dy)
+        targetRotation.y += dx * 0.006
+        targetRotation.x = THREE.MathUtils.clamp(targetRotation.x + dy * 0.004, -0.55, 0.34)
+        lastX = event.clientX
+        lastY = event.clientY
+      }
+    }
+
+    const onPointerUp = (event: PointerEvent) => {
+      updatePointer(event)
+      if (moved < 8) {
+        raycaster.setFromCamera(pointer, camera)
+        const hit = raycaster.intersectObjects(pickTargets, false)[0]
+        const layer = hit?.object.name as Layer | undefined
+        if (layer && layer in layers) onActive(layer)
+      }
+      dragging = false
+      renderer.domElement.classList.remove('is-dragging')
+    }
+
+    const onPointerLeave = () => {
+      dragging = false
+      renderer.domElement.classList.remove('is-dragging')
+    }
+
+    renderer.domElement.addEventListener('pointerdown', onPointerDown)
+    renderer.domElement.addEventListener('pointermove', onPointerMove)
+    renderer.domElement.addEventListener('pointerup', onPointerUp)
+    renderer.domElement.addEventListener('pointerleave', onPointerLeave)
 
     const resize = () => {
       const { width, height } = element.getBoundingClientRect()
-      camera.aspect = width / height
+      camera.aspect = width / Math.max(height, 1)
+      camera.position.z = width < 720 ? 15.8 : 13
       camera.updateProjectionMatrix()
       renderer.setSize(width, height, false)
     }
     resize()
-    const observer = new ResizeObserver(resize)
-    observer.observe(element)
+    const resizeObserver = new ResizeObserver(resize)
+    resizeObserver.observe(element)
 
-    const onMove = (event: PointerEvent) => {
-      const bounds = renderer.domElement.getBoundingClientRect()
-      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1
-      pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1
-      targetRotation.set(pointer.y * 0.08, pointer.x * 0.16)
-    }
-    const onLeave = () => targetRotation.set(0, 0)
-    const onClick = () => {
-      raycaster.setFromCamera(pointer, camera)
-      const hit = raycaster.intersectObjects(nodes, true)[0]
-      let target: THREE.Object3D | undefined = hit?.object
-      while (target && !target.name) target = target.parent ?? undefined
-      const layer = target?.name as Layer | undefined
-      if (layer && layer in layers) onActive(layer)
-    }
-    renderer.domElement.addEventListener('pointermove', onMove)
-    renderer.domElement.addEventListener('pointerleave', onLeave)
-    renderer.domElement.addEventListener('click', onClick)
-
+    const clock = new THREE.Clock()
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let frame = 0
-    const motionReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const animate = () => {
       const elapsed = clock.getElapsedTime()
-      scene.rotation.x = THREE.MathUtils.lerp(scene.rotation.x, targetRotation.x, 0.04)
-      scene.rotation.y = THREE.MathUtils.lerp(scene.rotation.y, targetRotation.y, 0.04)
-      nodes.forEach((node, index) => {
-        const isActive = node.name === activeRef.current
-        node.position.y += ((isActive ? 0.11 : 0) - node.position.y + specs[index].position[1]) * 0.07
-        if (!motionReduced) node.rotation.z = Math.sin(elapsed * 0.55 + index) * 0.018
+      machine.rotation.x = THREE.MathUtils.lerp(machine.rotation.x, targetRotation.x, 0.075)
+      machine.rotation.y = THREE.MathUtils.lerp(machine.rotation.y, targetRotation.y, 0.075)
+
+      layerGroups.forEach((group, index) => {
+        const layer = group.name as Layer
+        const selected = layer === activeRef.current
+        const targetZ = group.userData.baseZ + (selected ? 0.72 : 0)
+        const targetY = group.userData.baseY + (selected ? 0.14 : 0)
+        group.position.z = THREE.MathUtils.lerp(group.position.z, targetZ, 0.07)
+        group.position.y = THREE.MathUtils.lerp(group.position.y, targetY, 0.07)
+        const scale = THREE.MathUtils.lerp(group.scale.x, selected ? 1.045 : 1, 0.08)
+        group.scale.setScalar(scale)
+        materials[layer].emissiveIntensity = THREE.MathUtils.lerp(materials[layer].emissiveIntensity, selected ? 0.34 : 0.07, 0.08)
+        if (!reducedMotion) group.rotation.z = Math.sin(elapsed * 0.45 + index * 1.7) * 0.012
       })
-      if (!motionReduced) dustCloud.rotation.y = elapsed * 0.015
+
+      if (!reducedMotion) {
+        core.rotation.z = elapsed * 0.35
+        coreDot.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.12)
+        dustCloud.rotation.y = elapsed * 0.014
+      }
+
       renderer.render(scene, camera)
       frame = requestAnimationFrame(animate)
     }
@@ -164,98 +333,187 @@ function SystemCanvas({ active, onActive }: { active: Layer; onActive: (layer: L
 
     return () => {
       cancelAnimationFrame(frame)
-      observer.disconnect()
-      renderer.domElement.removeEventListener('pointermove', onMove)
-      renderer.domElement.removeEventListener('pointerleave', onLeave)
-      renderer.domElement.removeEventListener('click', onClick)
+      resizeObserver.disconnect()
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown)
+      renderer.domElement.removeEventListener('pointermove', onPointerMove)
+      renderer.domElement.removeEventListener('pointerup', onPointerUp)
+      renderer.domElement.removeEventListener('pointerleave', onPointerLeave)
       renderer.dispose()
       element.removeChild(renderer.domElement)
     }
   }, [onActive])
 
-  return <div className="system-canvas" ref={host} aria-hidden="true" />
+  return <div className="machine-canvas" ref={host} />
+}
+
+function ProjectVisual({ kind }: { kind: string }) {
+  if (kind === 'bks') {
+    return (
+      <div className="visual visual-bks" aria-hidden="true">
+        <div className="browser-line" />
+        <div className="bks-type">BKS</div>
+        <div className="bks-grid"><i /><i /><i /><i /></div>
+      </div>
+    )
+  }
+
+  if (kind === 'fintherm') {
+    return (
+      <div className="visual visual-fintherm" aria-hidden="true">
+        <div className="heat-disc" />
+        <div className="admin-window"><i /><i /><i /><i /><i /></div>
+        <div className="temperature">+72°C</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="visual visual-theone" aria-hidden="true">
+      <div className="one-word">ONE</div>
+      <div className="catalog-sheet sheet-a" />
+      <div className="catalog-sheet sheet-b" />
+      <div className="catalog-sheet sheet-c" />
+    </div>
+  )
+}
+
+function ProjectCard({ study, index }: { study: typeof caseStudies[number]; index: number }) {
+  const card = useRef<HTMLAnchorElement>(null)
+  const onMove = (event: ReactPointerEvent<HTMLAnchorElement>) => {
+    const element = card.current
+    if (!element) return
+    const rect = element.getBoundingClientRect()
+    element.style.setProperty('--mx', `${((event.clientX - rect.left) / rect.width - 0.5) * 18}px`)
+    element.style.setProperty('--my', `${((event.clientY - rect.top) / rect.height - 0.5) * 18}px`)
+  }
+  const onLeave = () => {
+    card.current?.style.setProperty('--mx', '0px')
+    card.current?.style.setProperty('--my', '0px')
+  }
+
+  return (
+    <a ref={card} className={`project project-${study.visual}`} href={study.href} target="_blank" rel="noreferrer" onPointerMove={onMove} onPointerLeave={onLeave} style={{ '--project-index': index } as CSSProperties}>
+      <div className="project-copy">
+        <div className="project-meta"><span>{study.kind}</span><b>↗</b></div>
+        <h3>{study.name}</h3>
+        <p>{study.copy}</p>
+        <small>{study.stack}</small>
+      </div>
+      <ProjectVisual kind={study.visual} />
+    </a>
+  )
+}
+
+function TicketFlow() {
+  const [step, setStep] = useState(2)
+  const steps = [
+    { name: 'Booking', value: '42 seats', note: 'A real order enters the system.' },
+    { name: 'QR issue', value: 'TK–1842', note: 'A unique code connects payment and entry.' },
+    { name: 'Validation', value: 'Valid', note: 'The door gets an immediate, unambiguous answer.' },
+    { name: 'Analytics', value: '$ 8,420', note: 'The sale becomes a useful operational signal.' },
+  ]
+  const current = steps[step]
+
+  return (
+    <div className="flow-console">
+      <div className="flow-steps" role="tablist" aria-label="Ticketing workflow">
+        {steps.map((item, index) => (
+          <button key={item.name} role="tab" aria-selected={step === index} onClick={() => setStep(index)}><span>{item.name}</span><i /></button>
+        ))}
+      </div>
+      <div className="flow-output" aria-live="polite">
+        <div className={`qr-mark ${step === 2 ? 'is-valid' : ''}`}><span /></div>
+        <div>
+          <small>System output</small>
+          <strong>{current.value}</strong>
+          <p>{current.note}</p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function App() {
-  const [active, setActive] = useState<Layer>('admin')
+  const [active, setActive] = useState<Layer>('control')
+  const [time, setTime] = useState('')
   const current = layers[active]
+
+  useEffect(() => {
+    const update = () => setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    update()
+    const timer = window.setInterval(update, 1000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   return (
     <main>
-      <nav className="topbar" aria-label="Primary navigation">
-        <a className="wordmark" href="#top" aria-label="br2nd.tech home">br2nd<span>.</span>tech</a>
-        <a href="#systems">Systems</a>
-        <a href="#work">Work</a>
-        <a className="github-link" href="https://github.com/br2nd-tech" target="_blank" rel="noreferrer">GitHub ↗</a>
-      </nav>
-
       <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="kicker">TypeScript product developer</p>
-          <h1>Interfaces are only<br />half the product.</h1>
-          <p className="intro">I build the public surface, the back office behind it, and the operational workflows that make both useful.</p>
-          <a className="quiet-link" href="#systems">Explore the system <span>↓</span></a>
-        </div>
-        <div className="hero-index" aria-label="Available for freelance product work">
-          <span className="pulse" /> Available for selected builds
-        </div>
-      </section>
+        <nav className="topbar" aria-label="Primary navigation">
+          <a className="wordmark" href="#top" aria-label="br2nd.tech home">br2nd<span>.</span>tech</a>
+          <div className="nav-system"><i /> System online <span>{time}</span></div>
+          <a href="#work">Work</a>
+          <a href="https://github.com/br2nd-tech" target="_blank" rel="noreferrer">GitHub</a>
+        </nav>
 
-      <section className="systems" id="systems" aria-labelledby="systems-heading">
-        <div className="scene-wrap">
-          <SystemCanvas active={active} onActive={setActive} />
-          <p className="scene-note">Move through the system. Click a module.</p>
+        <ProductMachine active={active} onActive={setActive} />
+
+        <div className="hero-copy">
+          <p>TypeScript product developer</p>
+          <h1>Visible is not<br />the same as<br />finished.</h1>
+          <span>I build the interface, the custom admin and the operational logic behind both.</span>
         </div>
-        <div className="system-detail">
-          <p className="kicker" id="systems-heading">Product system / three layers</p>
-          <div className="switcher" role="tablist" aria-label="Product layers">
-            {(Object.keys(layers) as Layer[]).map((layer) => (
-              <button key={layer} role="tab" aria-selected={active === layer} onClick={() => setActive(layer)}>{layers[layer].index}</button>
+
+        <div className="layer-console">
+          <div className="console-head"><span>Inspect the product</span><small>Drag the object</small></div>
+          <div className="layer-tabs" role="tablist" aria-label="Product layers">
+            {layerOrder.map((layer) => (
+              <button key={layer} role="tab" aria-selected={active === layer} onClick={() => setActive(layer)}><span>{layers[layer].code}</span>{layers[layer].label}</button>
             ))}
           </div>
-          <p className="system-number">{current.index}</p>
-          <h2>{current.title}</h2>
-          <p className="detail-copy">{current.body}</p>
-          <ul>
-            {current.signals.map((signal) => <li key={signal}>{signal}</li>)}
-          </ul>
-        </div>
-      </section>
-
-      <section className="work" id="work" aria-labelledby="work-heading">
-        <div className="section-lede">
-          <p className="kicker">Selected work</p>
-          <h2 id="work-heading">Production work, not concept screens.</h2>
-          <p>Each project includes the parts a client needs to actually run it — not just a nice first page.</p>
-        </div>
-        <div className="case-list">
-          {caseStudies.map((study, index) => (
-            <a className="case" key={study.name} href={study.url} target="_blank" rel="noreferrer">
-              <span>0{index + 1}</span>
-              <strong>{study.name}</strong>
-              <em>{study.type}</em>
-              <b>↗</b>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      <section className="ticketing" aria-labelledby="ticketing-heading">
-        <p className="kicker">In build / ticketing platform</p>
-        <h2 id="ticketing-heading">One booking.<br />One code.<br />A traceable sale.</h2>
-        <div className="ticket-layout">
-          <p>An anonymised product case: booking, QR confirmation at entry, and sales analytics in a shared operational dashboard.</p>
-          <div className="qr-card" aria-label="Stylised QR ticket preview">
-            <div className="qr-grid" />
-            <span>VALID / 18:42</span>
-            <small>Entry confirmed</small>
+          <div className="layer-readout">
+            <strong>{current.title}</strong>
+            <p>{current.body}</p>
+            <small>{current.proof}</small>
           </div>
         </div>
+
+        <a className="scroll-cue" href="#thesis"><i /> Scroll to open the system</a>
+      </section>
+
+      <section className="thesis" id="thesis">
+        <div className="thesis-index">One product / three realities</div>
+        <p className="thesis-large">A polished screen gets attention. A system that can be operated, edited and measured earns its keep.</p>
+        <div className="thesis-aside"><span>What ships</span><p>Public UI<br />Custom admin<br />Product workflows<br />Deployment</p></div>
+      </section>
+
+      <section className="work" id="work" aria-labelledby="work-title">
+        <header className="work-header">
+          <p>Selected production work</p>
+          <h2 id="work-title">Built for use,<br />not applause.</h2>
+          <span>Three live products. Each one includes the less visible work that keeps it useful after launch.</span>
+        </header>
+        <div className="projects">{caseStudies.map((study, index) => <ProjectCard key={study.name} study={study} index={index} />)}</div>
+      </section>
+
+      <section className="ticketing" aria-labelledby="ticketing-title">
+        <div className="ticket-copy">
+          <p>System in progress</p>
+          <h2 id="ticketing-title">From a seat<br />to a signal.</h2>
+          <span>One operational product handles booking, ticket generation, QR confirmation at the door and the sales picture behind it.</span>
+        </div>
+        <TicketFlow />
+      </section>
+
+      <section className="contact">
+        <div className="contact-status"><i /> Available for one serious build</div>
+        <h2>Need the whole product,<br />not just its homepage?</h2>
+        <a href="https://github.com/br2nd-tech" target="_blank" rel="noreferrer">Start on GitHub <span>↗</span></a>
       </section>
 
       <footer>
-        <p>br2nd.tech / TypeScript, React, Svelte, Tailwind</p>
-        <a href="https://github.com/br2nd-tech" target="_blank" rel="noreferrer">github.com/br2nd-tech ↗</a>
+        <a className="wordmark" href="#top">br2nd<span>.</span>tech</a>
+        <p>TypeScript · React · Svelte · Tailwind · WebGL</p>
+        <p>Interface / Admin / Operations</p>
       </footer>
     </main>
   )
