@@ -299,11 +299,13 @@ function ProductMachine({ active, onActive }: { active: Layer; onActive: (layer:
     const resizeObserver = new ResizeObserver(resize)
     resizeObserver.observe(element)
 
-    const clock = new THREE.Clock()
+    const timer = new THREE.Timer()
+    timer.connect(document)
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let frame = 0
-    const animate = () => {
-      const elapsed = clock.getElapsedTime()
+    const animate = (timestamp?: number) => {
+      timer.update(timestamp)
+      const elapsed = timer.getElapsed()
       machine.rotation.x = THREE.MathUtils.lerp(machine.rotation.x, targetRotation.x, 0.075)
       machine.rotation.y = THREE.MathUtils.lerp(machine.rotation.y, targetRotation.y, 0.075)
 
@@ -333,6 +335,7 @@ function ProductMachine({ active, onActive }: { active: Layer; onActive: (layer:
 
     return () => {
       cancelAnimationFrame(frame)
+      timer.dispose()
       resizeObserver.disconnect()
       renderer.domElement.removeEventListener('pointerdown', onPointerDown)
       renderer.domElement.removeEventListener('pointermove', onPointerMove)
