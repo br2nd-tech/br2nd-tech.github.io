@@ -102,123 +102,159 @@ function ProductMachine({ active, onActive }: { active: Layer; onActive: (layer:
     scene.add(orange)
 
     const machine = new THREE.Group()
-    machine.rotation.set(-0.12, -0.3, -0.035)
+    machine.position.set(0.65, -0.05, 0)
+    machine.rotation.set(-0.06, -0.22, -0.025)
     scene.add(machine)
 
-    const targetRotation = new THREE.Vector2(-0.12, -0.3)
+    const targetRotation = new THREE.Vector2(-0.06, -0.22)
     const pointer = new THREE.Vector2(2, 2)
     const raycaster = new THREE.Raycaster()
-    const layerGroups: THREE.Group[] = []
     const pickTargets: THREE.Object3D[] = []
+    const cardMounts: THREE.Group[] = []
     const materials: Record<Layer, THREE.MeshStandardMaterial> = {} as Record<Layer, THREE.MeshStandardMaterial>
+    const wheel = new THREE.Group()
+    machine.add(wheel)
 
-    const frameMaterial = new THREE.MeshStandardMaterial({ color: '#171b19', roughness: 0.43, metalness: 0.55 })
-    const specs: Array<{ layer: Layer; y: number; z: number; width: number; height: number }> = [
-      { layer: 'surface', y: 1.05, z: 1.9, width: 5.4, height: 3.15 },
-      { layer: 'control', y: 0, z: 0, width: 6.1, height: 3.6 },
-      { layer: 'signal', y: -1.02, z: -1.9, width: 5.1, height: 2.9 },
-    ]
+    const stepAngle = (Math.PI * 2) / layerOrder.length
+    const wheelRadius = 2.05
+    const cardWidth = 5.8
+    const cardHeight = 3.32
+    let selectedIndex = layerOrder.indexOf(activeRef.current)
+    wheel.rotation.x = -selectedIndex * stepAngle
+    let targetWheelAngle = wheel.rotation.x
+    let wheelVelocity = 0
 
-    specs.forEach((spec, layerIndex) => {
-      const group = new THREE.Group()
-      group.name = spec.layer
-      group.userData.baseY = spec.y
-      group.userData.baseZ = spec.z
-      group.position.set((layerIndex - 1) * 0.3, spec.y, spec.z)
+    const frameMaterial = new THREE.MeshStandardMaterial({ color: '#171b19', roughness: 0.4, metalness: 0.62 })
+    const hardwareMaterial = new THREE.MeshStandardMaterial({ color: '#d9d7cf', roughness: 0.26, metalness: 0.82 })
 
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(spec.width + 0.26, spec.height + 0.26, 0.18), frameMaterial)
-      frame.name = spec.layer
-      group.add(frame)
+    layerOrder.forEach((layer, layerIndex) => {
+      const pivot = new THREE.Group()
+      pivot.rotation.x = layerIndex * stepAngle
+      wheel.add(pivot)
+
+      const arms = new THREE.Group()
+      ;[-cardWidth * 0.38, cardWidth * 0.38].forEach((x) => {
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.055, wheelRadius, 0.055), hardwareMaterial)
+        arm.position.set(x, wheelRadius / 2, 0)
+        arms.add(arm)
+      })
+      pivot.add(arms)
+
+      const hinge = new THREE.Group()
+      hinge.position.y = wheelRadius
+      pivot.add(hinge)
+      cardMounts.push(hinge)
+
+      const hingeBar = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, cardWidth + 0.5, 20), hardwareMaterial)
+      hingeBar.rotation.z = Math.PI / 2
+      hinge.add(hingeBar)
+
+      ;[-cardWidth * 0.4, cardWidth * 0.4].forEach((x) => {
+        const collar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.055, 10, 28), frameMaterial)
+        collar.position.x = x
+        collar.rotation.y = Math.PI / 2
+        hinge.add(collar)
+      })
+
+      const card = new THREE.Group()
+      card.name = layer
+      card.position.y = -(cardHeight / 2 + 0.18)
+      hinge.add(card)
+
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(cardWidth + 0.22, cardHeight + 0.22, 0.18), frameMaterial)
+      frame.name = layer
+      card.add(frame)
       pickTargets.push(frame)
 
       const material = new THREE.MeshStandardMaterial({
-        color: layers[spec.layer].color,
-        emissive: layers[spec.layer].color,
-        emissiveIntensity: spec.layer === activeRef.current ? 0.28 : 0.07,
+        color: layers[layer].color,
+        emissive: layers[layer].color,
+        emissiveIntensity: layer === activeRef.current ? 0.3 : 0.05,
         roughness: 0.34,
-        metalness: 0.18,
+        metalness: 0.16,
       })
-      materials[spec.layer] = material
-      const screen = new THREE.Mesh(new THREE.BoxGeometry(spec.width, spec.height, 0.2), material)
-      screen.name = spec.layer
-      screen.position.z = 0.14
-      group.add(screen)
+      materials[layer] = material
+      const screen = new THREE.Mesh(new THREE.BoxGeometry(cardWidth, cardHeight, 0.2), material)
+      screen.name = layer
+      screen.position.z = 0.13
+      card.add(screen)
       pickTargets.push(screen)
 
-      const ink = new THREE.MeshBasicMaterial({ color: '#111412', transparent: true, opacity: 0.78 })
-      const paleInk = new THREE.MeshBasicMaterial({ color: '#edebe4', transparent: true, opacity: 0.72 })
+      const ink = new THREE.MeshBasicMaterial({ color: '#111412', transparent: true, opacity: 0.82 })
+      const paleInk = new THREE.MeshBasicMaterial({ color: '#edebe4', transparent: true, opacity: 0.78 })
       const content = new THREE.Group()
-      content.position.z = 0.27
+      content.position.z = 0.26
+      card.add(content)
 
-      const header = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.88, 0.12, 0.035), ink)
-      header.position.y = spec.height * 0.33
+      const header = new THREE.Mesh(new THREE.BoxGeometry(cardWidth * 0.88, 0.12, 0.035), ink)
+      header.position.y = cardHeight * 0.34
       content.add(header)
 
-      if (spec.layer === 'surface') {
-        const hero = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.54, spec.height * 0.52, 0.04), paleInk)
-        hero.position.set(-spec.width * 0.15, -0.12, 0)
+      if (layer === 'surface') {
+        const hero = new THREE.Mesh(new THREE.BoxGeometry(cardWidth * 0.52, cardHeight * 0.5, 0.04), paleInk)
+        hero.position.set(-cardWidth * 0.16, -0.12, 0)
         content.add(hero)
         for (let i = 0; i < 3; i += 1) {
-          const line = new THREE.Mesh(new THREE.BoxGeometry(spec.width * (0.26 - i * 0.035), 0.09, 0.045), ink)
-          line.position.set(spec.width * 0.29, 0.42 - i * 0.32, 0)
+          const line = new THREE.Mesh(new THREE.BoxGeometry(cardWidth * (0.25 - i * 0.035), 0.09, 0.045), ink)
+          line.position.set(cardWidth * 0.3, 0.42 - i * 0.32, 0)
           content.add(line)
         }
       }
 
-      if (spec.layer === 'control') {
-        const rail = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.17, spec.height * 0.68, 0.04), ink)
-        rail.position.set(-spec.width * 0.35, -0.12, 0)
+      if (layer === 'control') {
+        const rail = new THREE.Mesh(new THREE.BoxGeometry(cardWidth * 0.16, cardHeight * 0.68, 0.04), ink)
+        rail.position.set(-cardWidth * 0.36, -0.12, 0)
         content.add(rail)
         for (let i = 0; i < 6; i += 1) {
-          const cell = new THREE.Mesh(new THREE.BoxGeometry(spec.width * 0.25, 0.34, 0.045), i % 2 ? ink : paleInk)
-          cell.position.set(-spec.width * 0.08 + (i % 2) * spec.width * 0.29, 0.44 - Math.floor(i / 2) * 0.55, 0)
+          const cell = new THREE.Mesh(new THREE.BoxGeometry(cardWidth * 0.25, 0.34, 0.045), i % 2 ? ink : paleInk)
+          cell.position.set(-cardWidth * 0.08 + (i % 2) * cardWidth * 0.29, 0.44 - Math.floor(i / 2) * 0.55, 0)
           content.add(cell)
         }
       }
 
-      if (spec.layer === 'signal') {
-        const bars = [0.32, 0.7, 0.48, 0.88, 0.6, 1]
-        bars.forEach((height, index) => {
-          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.34, spec.height * height * 0.44, 0.045), ink)
-          bar.position.set(-1.25 + index * 0.5, -spec.height * 0.18 + (spec.height * height * 0.22), 0)
+      if (layer === 'signal') {
+        ;[0.32, 0.7, 0.48, 0.88, 0.6, 1].forEach((height, index) => {
+          const bar = new THREE.Mesh(new THREE.BoxGeometry(0.34, cardHeight * height * 0.44, 0.045), ink)
+          bar.position.set(-1.25 + index * 0.5, -cardHeight * 0.18 + (cardHeight * height * 0.22), 0)
           content.add(bar)
         })
         const status = new THREE.Mesh(new THREE.SphereGeometry(0.19, 20, 20), paleInk)
-        status.position.set(spec.width * 0.35, -spec.height * 0.24, 0.02)
+        status.position.set(cardWidth * 0.35, -cardHeight * 0.24, 0.02)
         content.add(status)
       }
-
-      group.add(content)
-      layerGroups.push(group)
-      machine.add(group)
     })
 
-    const core = new THREE.Group()
-    const coreRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.68, 0.08, 12, 72),
-      new THREE.MeshStandardMaterial({ color: '#edebe4', emissive: '#75e2f0', emissiveIntensity: 0.45, metalness: 0.7, roughness: 0.2 }),
-    )
-    coreRing.rotation.x = Math.PI / 2
-    core.add(coreRing)
-    const coreDot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 24, 24),
-      new THREE.MeshStandardMaterial({ color: '#ff4f2e', emissive: '#ff4f2e', emissiveIntensity: 1 }),
-    )
-    core.add(coreDot)
-    core.position.set(0, 0, 3.35)
-    machine.add(core)
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 7.3, 28), frameMaterial)
+    axle.rotation.z = Math.PI / 2
+    machine.add(axle)
 
-    const circuitMaterial = new THREE.LineBasicMaterial({ color: '#111412', transparent: true, opacity: 0.38 })
-    for (let i = 0; i < 14; i += 1) {
-      const angle = (i / 14) * Math.PI * 2
-      const radius = 4.2 + (i % 3) * 0.38
-      const points = [
-        new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.58, -3.2),
-        new THREE.Vector3(Math.cos(angle) * radius * 0.74, Math.sin(angle) * radius * 0.42, 0),
-        new THREE.Vector3(Math.cos(angle) * radius * 0.42, Math.sin(angle) * radius * 0.22, 3.25),
-      ]
-      machine.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), circuitMaterial))
-    }
+    ;[-3.3, 3.3].forEach((x) => {
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(wheelRadius, 0.08, 12, 80), hardwareMaterial)
+      rim.position.x = x
+      rim.rotation.y = Math.PI / 2
+      wheel.add(rim)
+
+      for (let spokeIndex = 0; spokeIndex < 6; spokeIndex += 1) {
+        const angle = (spokeIndex / 6) * Math.PI * 2
+        const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, wheelRadius * 1.92, 10), hardwareMaterial)
+        spoke.position.x = x
+        spoke.rotation.x = angle
+        wheel.add(spoke)
+      }
+
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.28, 24), frameMaterial)
+      hub.position.x = x
+      hub.rotation.z = Math.PI / 2
+      wheel.add(hub)
+    })
+
+    const counter = new THREE.Mesh(
+      new THREE.TorusGeometry(0.46, 0.07, 12, 60),
+      new THREE.MeshStandardMaterial({ color: '#ff4f2e', emissive: '#ff4f2e', emissiveIntensity: 0.65, metalness: 0.4, roughness: 0.24 }),
+    )
+    counter.position.set(3.48, 0, 0)
+    counter.rotation.y = Math.PI / 2
+    wheel.add(counter)
 
     const dustGeometry = new THREE.BufferGeometry()
     const dust = Array.from({ length: 260 }, () => [
@@ -309,24 +345,35 @@ function ProductMachine({ active, onActive }: { active: Layer; onActive: (layer:
       machine.rotation.x = THREE.MathUtils.lerp(machine.rotation.x, targetRotation.x, 0.075)
       machine.rotation.y = THREE.MathUtils.lerp(machine.rotation.y, targetRotation.y, 0.075)
 
-      layerGroups.forEach((group, index) => {
-        const layer = group.name as Layer
-        const selected = layer === activeRef.current
-        const targetZ = group.userData.baseZ + (selected ? 0.72 : 0)
-        const targetY = group.userData.baseY + (selected ? 0.14 : 0)
-        group.position.z = THREE.MathUtils.lerp(group.position.z, targetZ, 0.07)
-        group.position.y = THREE.MathUtils.lerp(group.position.y, targetY, 0.07)
-        const scale = THREE.MathUtils.lerp(group.scale.x, selected ? 1.045 : 1, 0.08)
-        group.scale.setScalar(scale)
-        materials[layer].emissiveIntensity = THREE.MathUtils.lerp(materials[layer].emissiveIntensity, selected ? 0.34 : 0.07, 0.08)
-        if (!reducedMotion) group.rotation.z = Math.sin(elapsed * 0.45 + index * 1.7) * 0.012
+      const nextIndex = layerOrder.indexOf(activeRef.current)
+      if (nextIndex !== selectedIndex) {
+        const baseTarget = -nextIndex * stepAngle
+        targetWheelAngle = baseTarget + Math.round((wheel.rotation.x - baseTarget) / (Math.PI * 2)) * Math.PI * 2
+        selectedIndex = nextIndex
+      }
+
+      if (reducedMotion) {
+        wheel.rotation.x = targetWheelAngle
+        wheelVelocity = 0
+      } else {
+        wheelVelocity += (targetWheelAngle - wheel.rotation.x) * 0.025
+        wheelVelocity *= 0.82
+        wheel.rotation.x += wheelVelocity
+      }
+
+      cardMounts.forEach((mount, index) => {
+        const lag = reducedMotion ? 0 : -wheelVelocity * 1.7
+        mount.rotation.x = THREE.MathUtils.lerp(mount.rotation.x, lag, 0.13)
+        const layer = layerOrder[index]
+        mount.position.z = THREE.MathUtils.lerp(mount.position.z, layer === activeRef.current ? 1.55 : 0, 0.11)
+        materials[layer].emissiveIntensity = THREE.MathUtils.lerp(
+          materials[layer].emissiveIntensity,
+          layer === activeRef.current ? 0.32 : 0.045,
+          0.09,
+        )
       })
 
-      if (!reducedMotion) {
-        core.rotation.z = elapsed * 0.35
-        coreDot.scale.setScalar(1 + Math.sin(elapsed * 2.4) * 0.12)
-        dustCloud.rotation.y = elapsed * 0.014
-      }
+      if (!reducedMotion) dustCloud.rotation.y = elapsed * 0.012
 
       renderer.render(scene, camera)
       frame = requestAnimationFrame(animate)
@@ -467,7 +514,7 @@ function App() {
         </div>
 
         <div className="layer-console">
-          <div className="console-head"><span>Inspect the product</span><small>Drag the object</small></div>
+          <div className="console-head"><span>Inspect the product</span><small>Wheel / 120° steps</small></div>
           <div className="layer-tabs" role="tablist" aria-label="Product layers">
             {layerOrder.map((layer) => (
               <button key={layer} role="tab" aria-selected={active === layer} onClick={() => setActive(layer)}><span>{layers[layer].code}</span>{layers[layer].label}</button>
